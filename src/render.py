@@ -153,6 +153,41 @@ def camara(cx, cy, s):
     return FOTO.transform((W, H), Image.AFFINE, (a, 0, cx - W / 2 * a, 0, a, cy - H / 2 * a), Image.BICUBIC)
 
 
+def _fondo_foto():
+    lado = H
+    grande = FOTO.resize((lado, lado), Image.LANCZOS)
+    x0 = (lado - W) // 2
+    fondo = grande.crop((x0, 0, x0 + W, H)).filter(ImageFilter.GaussianBlur(38))
+    return Image.blend(fondo, Image.new("RGB", (W, H), (20, 14, 12)), 0.45)
+
+
+def _tarjeta_foto(lado=1000, radio=40):
+    foto = FOTO.resize((lado, lado), Image.LANCZOS).convert("RGBA")
+    mascara = Image.new("L", (lado, lado), 0)
+    ImageDraw.Draw(mascara).rounded_rectangle((0, 0, lado - 1, lado - 1), radio, fill=255)
+    foto.putalpha(mascara)
+    return foto
+
+
+FONDO_FOTO = _fondo_foto()
+TARJETA_FOTO = _tarjeta_foto()
+LADO_FOTO = 940
+SOMBRA_FOTO = Image.new("RGBA", (LADO_FOTO + 160, LADO_FOTO + 160), (0, 0, 0, 0))
+ImageDraw.Draw(SOMBRA_FOTO).rounded_rectangle((80, 95, 80 + LADO_FOTO, 95 + LADO_FOTO), 40, fill=(0, 0, 0, 150))
+SOMBRA_FOTO = SOMBRA_FOTO.filter(ImageFilter.GaussianBlur(28))
+
+
+def foto_centrada(zoom=1.0, cy=H / 2):
+    """La foto completa, centrada y con esquinas redondeadas; `zoom` hace un ligero acercamiento."""
+    img = FONDO_FOTO.copy()
+    lado = int(LADO_FOTO * zoom)
+    img.paste(SOMBRA_FOTO.convert("RGB"), (int(W / 2 - SOMBRA_FOTO.width / 2), int(cy - SOMBRA_FOTO.height / 2)),
+              SOMBRA_FOTO.getchannel("A"))
+    tarjeta = TARJETA_FOTO.resize((lado, lado), Image.BICUBIC)
+    img.paste(tarjeta.convert("RGB"), (int(W / 2 - lado / 2), int(cy - lado / 2)), tarjeta.getchannel("A"))
+    return img
+
+
 def gradiente(alto, desde, hasta, color=(0, 0, 0)):
     """Capa RGBA vertical que va de opacidad `desde` a `hasta`."""
     g = np.linspace(desde, hasta, alto)[:, None] * 255
@@ -281,23 +316,21 @@ def fondo_papel(t):
 def esc_intro(t, T):
     e = T["intro"]
     p = (t - e["inicio"]) / (T["presentacion"]["fin"] - e["inicio"])
-    img = camara(627 - 30 * p, 640 + 30 * p, 1.62 + 0.25 * p)
-    img.paste(GRAD_ARRIBA, (0, 0), GRAD_ARRIBA)
+    img = foto_centrada(0.97 + 0.04 * p, 1010)
     a1 = aparece(t, 0.35, 0.9)
-    pegar(img, texto("Aragón", "script", 210, BLANCO, sombra=8), W / 2, 470 - 30 * a1, a1)
+    pegar(img, texto("Aragón", "script", 190, BLANCO, sombra=8), W / 2, 250 - 30 * a1, a1)
     a2 = aparece(t, 0.95, 0.8)
-    pegar(img, texto("TAMBIÉN SE RESPIRA", "sans", 40, BLANCO, 500, tracking=9, sombra=6), W / 2, 640 - 20 * a2, a2)
+    pegar(img, texto("TAMBIÉN SE RESPIRA", "sans", 40, BLANCO, 500, tracking=9, sombra=6), W / 2, 415 - 20 * a2, a2)
     return img
 
 
 def esc_presentacion(t, T):
     e = T["presentacion"]
     p = (t - T["intro"]["inicio"]) / (e["fin"] - T["intro"]["inicio"])
-    img = camara(627 - 30 * p, 640 + 30 * p, 1.62 + 0.25 * p)
-    img.paste(GRAD_ABAJO, (0, H - 900), GRAD_ABAJO)
+    img = foto_centrada(0.97 + 0.04 * p, 1010 - 180 * ease_in_out((t - e["inicio"]) / 0.9))
     a = aparece(t, e["inicio"] + 0.2, 0.8)
-    y = 1560 + 60 * (1 - a)
-    pegar(img, tarjeta(900, 400, alpha=238), W / 2, y, a)
+    y = 1580 + 60 * (1 - a)
+    pegar(img, tarjeta(900, 400, alpha=245), W / 2, y, a)
     pegar(img, texto("TE PRESENTAMOS", "sans", 30, ROJO, 600, tracking=8), W / 2, y - 130, a)
     a2 = aparece(t, momento("presentacion", "Ambientador", T) - 0.1, 0.8)
     pegar(img, texto("Ambientador", "script", 118, NEGRO), W / 2, y - 40, a2)
@@ -310,14 +343,13 @@ def esc_presentacion(t, T):
 def esc_pulverizador(t, T):
     e = T["pulverizador"]
     p = (t - e["inicio"]) / (e["fin"] - e["inicio"])
-    img = camara(1000, 640, 1.95 + 0.15 * p)
-    img.paste(GRAD_ABAJO, (0, H - 900), GRAD_ABAJO)
+    img = foto_centrada(1.0 + 0.03 * p, 830)
     items = [
         ("10 ml", "diez", "script", 120),
         ("PULVERIZADOR INCLUIDO", "pulverizador", "sans", 36),
         ("ESENCIAS NATURALES", "esencias", "sans", 36),
     ]
-    ys = [1420, 1590, 1710]
+    ys = [1435, 1600, 1725]
     for (txt, frag, f, tam), y in zip(items, ys):
         a = aparece(t, momento("pulverizador", frag, T) - 0.25, 0.6)
         if f == "script":
@@ -459,34 +491,38 @@ def esc_colabora(t, T):
     img = FONDO_VICHY.crop((off, off, off + W, off + H))
     img = Image.blend(img, Image.new("RGB", (W, H), NEGRO), 0.7)
     a = aparece(t, e["inicio"] + 0.1, 0.7)
-    pegar(img, texto("¿Tienes una tienda?", "script", 140, BLANCO, sombra=4), W / 2, 560 - 20 * (1 - a), a)
+    pegar(img, texto("¿Tienes una tienda?", "script", 140, BLANCO, sombra=4), W / 2, 330 - 20 * (1 - a), a)
     a2 = aparece(t, momento("colabora", "quieres", T) - 0.2, 0.7)
-    pegar(img, texto("COLABORA CON NOSOTROS", "sans", 46, CREMA, 600, tracking=8), W / 2, 740, a2)
-    pegar(img, separador(560, CREMA), W / 2, 840, a2)
+    pegar(img, texto("COLABORA CON NOSOTROS", "sans", 46, CREMA, 600, tracking=8), W / 2, 500, a2)
+    pegar(img, separador(560, CREMA), W / 2, 590, a2)
+    pegar(img, parrafo("Estamos abiertos a nuevas tiendas colaboradoras.", "serif", 58, CREMA, 860, 500),
+          W / 2, 700, a2)
     a3 = aparece(t, momento("colabora", "Escríbenos", T) - 0.2, 0.7)
-    pop = 0.8 + 0.2 * ease_out((t - momento("colabora", "Escríbenos", T)) / 0.5)
-    pegar(img, bocadillo(200, CREMA), W / 2, 1080, a3, pop)
-    pegar(img, parrafo("Estamos abiertos a nuevas tiendas colaboradoras.", "serif", 62, CREMA, 860, 500),
-          W / 2, 1320, a3)
-    pastilla = tarjeta(820, 110, color=CREMA, alpha=250, radio=55, sombra=False)
-    pegar(img, pastilla, W / 2, 1520, a3)
-    pegar(img, texto("ESCRÍBENOS POR MENSAJE PRIVADO", "sans", 34, ROJO, 700, tracking=3), W / 2, 1520, a3)
+    pegar(img, tarjeta(860, 100, color=CREMA, alpha=250, radio=50, sombra=False), W / 2, 880, a3)
+    pegar(img, texto("ESCRÍBENOS POR MENSAJE PRIVADO", "sans", 32, ROJO, 700, tracking=3), W / 2, 880, a3)
+    contactos = [("CORREO", "alldesignkarl@gmail.com", "correo", 1110),
+                 ("TELÉFONO", "614 65 37 36", "llámanos", 1340)]
+    for etiqueta, dato, frag, y in contactos:
+        ai = aparece(t, momento("colabora", frag, T) - 0.3, 0.6)
+        dy = 30 * (1 - ai)
+        pegar(img, tarjeta(860, 190, alpha=248), W / 2, y + dy, ai)
+        pegar(img, texto(etiqueta, "sans", 28, ROJO, 600, tracking=6), W / 2, y - 45 + dy, ai)
+        pegar(img, texto(dato, "serif", 68, NEGRO, 700), W / 2, y + 30 + dy, ai)
     a4 = aparece(t, momento("colabora", "te enviaremos", T), 0.7)
-    pegar(img, texto("y te enviaremos toda la información", "serif", 50, CREMA, 500), W / 2, 1650, a4)
+    pegar(img, texto("y te enviaremos toda la información", "serif", 50, CREMA, 500), W / 2, 1580, a4)
     return img
 
 
 def esc_cierre(t, T):
     e = T["cierre"]
     p = (t - e["inicio"]) / (e["fin"] - e["inicio"])
-    img = camara(620, 700, 1.8 - 0.22 * ease_in_out(p))
-    img.paste(GRAD_ARRIBA, (0, 0), GRAD_ARRIBA)
+    img = foto_centrada(1.02 - 0.05 * ease_in_out(p), 1100)
     a = aparece(t, e["inicio"] + 0.1, 0.8)
-    pegar(img, texto("Ambientador del Cachirulo", "script", 104, BLANCO, sombra=6), W / 2, 300, a)
+    pegar(img, texto("Ambientador del Cachirulo", "script", 104, BLANCO, sombra=6), W / 2, 200, a)
     a2 = aparece(t, momento("cierre", "Porque", T) - 0.1, 0.8)
-    pegar(img, texto("Aragón no solo se lleva en el pañuelo,", "serif", 58, BLANCO, 600, sombra=6), W / 2, 450, a2)
+    pegar(img, texto("Aragón no solo se lleva en el pañuelo,", "serif", 56, BLANCO, 600, sombra=6), W / 2, 340, a2)
     a3 = aparece(t, momento("cierre", "también", T) - 0.1, 0.8)
-    pegar(img, texto("también se lleva en casa.", "serif", 58, BLANCO, 600, sombra=6), W / 2, 530, a3)
+    pegar(img, texto("también se lleva en casa.", "serif", 56, BLANCO, 600, sombra=6), W / 2, 420, a3)
 
     # tarjeta final
     fin = ease_in_out((t - (e["voz_fin"] + 0.3)) / 0.8)

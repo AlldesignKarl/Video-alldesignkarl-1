@@ -53,8 +53,9 @@ ESCENAS = [
     {
         "id": "colabora",
         "voz": "¿Tienes una tienda y quieres colaborar con nosotros? "
-               "Escríbenos por mensaje privado y te enviaremos toda la información.",
-        "pausa": 0.5,
+               "Escríbenos por mensaje privado, por correo electrónico o llámanos por teléfono: "
+               "te enviaremos toda la información.",
+        "pausa": 1.2,
     },
     {
         "id": "cierre",

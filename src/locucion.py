@@ -37,11 +37,22 @@ ESTILO = os.environ.get("ESTILO", "")
 INICIO = 0.6  # silencio antes de la primera frase
 
 
-def recortar_silencio(audio, umbral=0.004, margen=int(0.05 * 24000)):
-    activo = np.where(np.abs(audio) > umbral)[0]
+def recortar_silencio(audio, sr=24000, antes=0.12, despues=0.3):
+    """Quita el silencio de los extremos con margen amplio y suaviza los bordes (sin clics ni cortes)."""
+    if len(audio) == 0:
+        return audio
+    umbral = max(0.002, 0.02 * float(np.abs(audio).max()))
+    # envolvente suavizada (10 ms) para no cortar consonantes suaves ni finales de palabra
+    ventana = max(1, int(0.01 * sr))
+    envolvente = np.convolve(np.abs(audio), np.ones(ventana) / ventana, mode="same")
+    activo = np.where(envolvente > umbral)[0]
     if len(activo) == 0:
         return audio
-    return audio[max(0, activo[0] - margen): activo[-1] + margen]
+    audio = audio[max(0, activo[0] - int(antes * sr)): activo[-1] + int(despues * sr)].copy()
+    entrada, salida = min(len(audio), int(0.015 * sr)), min(len(audio), int(0.08 * sr))
+    audio[:entrada] *= np.linspace(0, 1, entrada)
+    audio[len(audio) - salida:] *= np.linspace(1, 0, salida)
+    return audio
 
 
 def _post(url, cuerpo, cabeceras=None):
@@ -127,7 +138,7 @@ def motor_gemini():
             try:
                 r = pide(modelo, txt, con_estilo)
                 datos = r["candidates"][0]["content"]["parts"][0]["inlineData"]["data"]
-                audio = recortar_silencio(_pcm16(base64.b64decode(datos)))
+                audio = _pcm16(base64.b64decode(datos))
                 if con_estilo and len(audio) / 24000 > maximo:
                     print(f"  audio demasiado largo ({len(audio) / 24000:.1f}s > {maximo:.1f}s), "
                           "repito sin indicación de estilo")
@@ -210,7 +221,7 @@ def main():
         audio, sr = sintetiza(escena["voz"])
         if audio.ndim > 1:
             audio = audio.mean(axis=1)
-        audio = recortar_silencio(audio.astype(np.float32), margen=int(0.05 * sr))
+        audio = recortar_silencio(audio.astype(np.float32), sr)
         dur_voz = len(audio) / sr
         pausa = escena["pausa"]
         pista += [audio, np.zeros(int(pausa * sr), dtype=np.float32)]
