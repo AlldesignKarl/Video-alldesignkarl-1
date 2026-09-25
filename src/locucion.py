@@ -32,9 +32,8 @@ MODELOS = os.environ.get("KOKORO_DIR", os.path.join(RAIZ, "models"))
 MOTOR = os.environ.get("MOTOR", "kokoro")
 VOZ = os.environ.get("VOZ")
 VELOCIDAD = float(os.environ.get("VELOCIDAD", "0.92"))
-ESTILO = os.environ.get(
-    "ESTILO",
-    "Say in a warm, natural, friendly voice with a Castilian Spanish accent from Spain")
+# Indicación de tono para Gemini (vacía por defecto: algunos modelos la leen en voz alta)
+ESTILO = os.environ.get("ESTILO", "")
 INICIO = 0.6  # silencio antes de la primera frase
 
 
@@ -87,7 +86,10 @@ def _modelos_gemini(clave):
     tts = [m for m in modelos if "tts" in m]
     if not tts:
         sys.exit("La clave no tiene acceso a ningún modelo de voz de Gemini.")
-    return sorted(tts, key=lambda m: ("pro" not in m, "preview" in m, m))
+    def version(m):
+        v = re.search(r"gemini-(\d+(?:\.\d+)?)", m)
+        return float(v.group(1)) if v else 0.0
+    return sorted(tts, key=lambda m: ("pro" not in m, "lite" in m, -version(m), "preview" in m))
 
 
 def motor_gemini():
@@ -109,11 +111,18 @@ def motor_gemini():
         with urllib.request.urlopen(peticion, timeout=180) as r:
             return json.load(r)
 
+    def siguiente_modelo(motivo):
+        if len(modelos) == 1:
+            sys.exit(f"Ningún modelo de voz de Gemini tiene cupo disponible ({motivo}). Prueba mañana.")
+        print(f"  {modelos[0]}: {motivo}, paso a {modelos[1]}")
+        modelos.pop(0)
+
     def sintetiza(txt):
-        con_estilo = True
+        con_estilo = bool(ESTILO)
+        limitados = 0
         # duración máxima razonable: si se pasa, ha leído también la indicación de estilo
         maximo = 0.095 * len(txt) + 2.0
-        for intento in range(12):
+        for intento in range(20):
             modelo = modelos[0]
             try:
                 r = pide(modelo, txt, con_estilo)
@@ -124,14 +133,20 @@ def motor_gemini():
                           "repito sin indicación de estilo")
                     con_estilo = False
                     continue
+                # el plan gratuito admite pocas peticiones por minuto: espacia las llamadas
+                time.sleep(float(os.environ.get("GEMINI_PAUSA", "21")))
                 return audio, 24000
             except urllib.error.HTTPError as e:
                 cuerpo = e.read().decode(errors="replace")
-                if e.code == 429 and "limit: 0" in cuerpo and len(modelos) > 1:
-                    # el plan de la clave no incluye este modelo: pasa al siguiente
-                    print(f"  {modelo} no incluido en el plan, pruebo {modelos[1]}")
-                    modelos.pop(0)
+                if e.code == 429 and "limit: 0" in cuerpo:
+                    siguiente_modelo("no incluido en el plan")
                     continue
+                if e.code == 429:
+                    limitados += 1
+                    if limitados >= 3:
+                        siguiente_modelo("sin cupo")
+                        limitados = 0
+                        continue
                 if e.code in (429, 500, 503):
                     espera = re.search(r'"retryDelay":\s*"(\d+)', cuerpo)
                     espera = int(espera.group(1)) + 2 if espera else 20 * (intento + 1)
