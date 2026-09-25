@@ -74,10 +74,26 @@ def motor_google():
     return sintetiza
 
 
+def _modelo_gemini(clave):
+    """Elige el mejor modelo de voz disponible para la clave (prefiere los «pro»)."""
+    peticion = urllib.request.Request("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
+                                      headers={"x-goog-api-key": clave})
+    try:
+        with urllib.request.urlopen(peticion, timeout=60) as r:
+            modelos = [m["name"].split("/")[-1] for m in json.load(r).get("models", [])]
+    except urllib.error.HTTPError as e:
+        sys.exit(f"Error {e.code} al listar modelos de Gemini:\n{e.read().decode(errors='replace')}")
+    tts = [m for m in modelos if "tts" in m]
+    if not tts:
+        sys.exit("La clave no tiene acceso a ningún modelo de voz de Gemini.")
+    return sorted(tts, key=lambda m: ("pro" not in m, "preview" in m, m))[0]
+
+
 def motor_gemini():
     clave = os.environ["GEMINI_API_KEY"]
-    modelo = os.environ.get("GEMINI_MODELO", "gemini-2.5-pro-preview-tts")
+    modelo = os.environ.get("GEMINI_MODELO") or _modelo_gemini(clave)
     voz = VOZ or "Kore"
+    print(f"Gemini: modelo {modelo}, voz {voz}")
 
     def sintetiza(txt):
         r = json.loads(_post(
