@@ -15,7 +15,9 @@ import base64
 import io
 import json
 import os
+import re
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -74,8 +76,8 @@ def motor_google():
     return sintetiza
 
 
-def _modelo_gemini(clave):
-    """Elige el mejor modelo de voz disponible para la clave (prefiere los «pro»)."""
+def _modelos_gemini(clave):
+    """Modelos de voz disponibles para la clave, del mejor al más básico (primero los «pro»)."""
     peticion = urllib.request.Request("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
                                       headers={"x-goog-api-key": clave})
     try:
@@ -86,24 +88,52 @@ def _modelo_gemini(clave):
     tts = [m for m in modelos if "tts" in m]
     if not tts:
         sys.exit("La clave no tiene acceso a ningún modelo de voz de Gemini.")
-    return sorted(tts, key=lambda m: ("pro" not in m, "preview" in m, m))[0]
+    return sorted(tts, key=lambda m: ("pro" not in m, "preview" in m, m))
 
 
 def motor_gemini():
     clave = os.environ["GEMINI_API_KEY"]
-    modelo = os.environ.get("GEMINI_MODELO") or _modelo_gemini(clave)
+    modelos = [os.environ["GEMINI_MODELO"]] if os.environ.get("GEMINI_MODELO") else _modelos_gemini(clave)
     voz = VOZ or "Kore"
-    print(f"Gemini: modelo {modelo}, voz {voz}")
+    print(f"Gemini: modelos disponibles {modelos}, voz {voz}")
+
+    def pide(modelo, txt):
+        peticion = urllib.request.Request(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent",
+            data=json.dumps({
+                "contents": [{"parts": [{"text": f"{ESTILO}\n\n{txt}"}]}],
+                "generationConfig": {"responseModalities": ["AUDIO"],
+                                     "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voz}}}},
+            }).encode(),
+            headers={"Content-Type": "application/json", "x-goog-api-key": clave})
+        with urllib.request.urlopen(peticion, timeout=180) as r:
+            return json.load(r)
 
     def sintetiza(txt):
-        r = json.loads(_post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent",
-            {"contents": [{"parts": [{"text": f"{ESTILO}\n\n{txt}"}]}],
-             "generationConfig": {"responseModalities": ["AUDIO"],
-                                  "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voz}}}}},
-            {"x-goog-api-key": clave}))
-        datos = r["candidates"][0]["content"]["parts"][0]["inlineData"]["data"]
-        return _pcm16(base64.b64decode(datos)), 24000
+        for intento in range(12):
+            modelo = modelos[0]
+            try:
+                r = pide(modelo, txt)
+                datos = r["candidates"][0]["content"]["parts"][0]["inlineData"]["data"]
+                return _pcm16(base64.b64decode(datos)), 24000
+            except urllib.error.HTTPError as e:
+                cuerpo = e.read().decode(errors="replace")
+                if e.code == 429 and "limit: 0" in cuerpo and len(modelos) > 1:
+                    # el plan de la clave no incluye este modelo: pasa al siguiente
+                    print(f"  {modelo} no incluido en el plan, pruebo {modelos[1]}")
+                    modelos.pop(0)
+                    continue
+                if e.code in (429, 500, 503):
+                    espera = re.search(r'"retryDelay":\s*"(\d+)', cuerpo)
+                    espera = int(espera.group(1)) + 2 if espera else 20 * (intento + 1)
+                    print(f"  {modelo}: error {e.code}, espero {espera}s")
+                    time.sleep(espera)
+                    continue
+                sys.exit(f"Error {e.code} de Gemini ({modelo}):\n{cuerpo}")
+            except (KeyError, IndexError):
+                print(f"  {modelo}: respuesta sin audio, reintento")
+                time.sleep(5)
+        sys.exit("Gemini no ha devuelto audio tras varios intentos.")
     return sintetiza
 
 
