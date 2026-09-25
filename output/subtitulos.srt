@@ -1,39 +1,39 @@
 1
-00:00:00,600 --> 00:00:02,422
+00:00:00,600 --> 00:00:15,286
 Aragón también se respira.
 
 2
-00:00:02,922 --> 00:00:10,321
+00:00:15,786 --> 00:00:37,033
 Te presentamos el Ambientador del Cachirulo: una pieza artesanal, cuidada al detalle y con todo el carácter de nuestra tierra.
 
 3
-00:00:10,771 --> 00:00:15,458
+00:00:37,483 --> 00:00:53,609
 Incluye un pulverizador de diez mililitros, elaborado con esencias naturales.
 
 4
-00:00:15,908 --> 00:00:20,300
+00:00:54,059 --> 00:01:13,625
 Elige tu aroma favorito: coco y vainilla, mango y limón, o sol y mar.
 
 5
-00:00:20,800 --> 00:00:28,182
+00:01:14,125 --> 00:01:34,092
 Usarlo es muy sencillo. Primero, pulveriza el ambientador sobre el yeso cerámico, a unos quince o veinte centímetros.
 
 6
-00:00:28,531 --> 00:00:34,386
+00:01:34,442 --> 00:01:52,848
 Después, disfruta del aroma: el yeso absorbe la fragancia y la libera de forma suave y duradera.
 
 7
-00:00:34,736 --> 00:00:39,546
+00:01:53,198 --> 00:02:08,804
 Y cuando notes que el aroma disminuye, vuelve a pulverizar. ¡Y sigue disfrutando!
 
 8
-00:00:40,046 --> 00:00:50,756
+00:02:09,304 --> 00:02:32,951
 Lo encontrarás exclusivamente en tiendas físicas colaboradoras: en Mercería El Siglo, calle Cortes de Aragón, cuarenta y seis; y en Papelería Casablanca, calle La Vía, dieciséis.
 
 9
-00:00:51,256 --> 00:00:58,372
+00:02:33,451 --> 00:02:50,817
 ¿Tienes una tienda y quieres colaborar con nosotros? Escríbenos por mensaje privado y te enviaremos toda la información.
 
 10
-00:00:58,872 --> 00:01:04,532
+00:02:51,317 --> 00:03:10,283
 Ambientador del Cachirulo. Porque Aragón no solo se lleva en el pañuelo: también se lleva en casa.
