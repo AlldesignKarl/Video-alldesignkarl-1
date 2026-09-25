@@ -34,8 +34,7 @@ VOZ = os.environ.get("VOZ")
 VELOCIDAD = float(os.environ.get("VELOCIDAD", "0.92"))
 ESTILO = os.environ.get(
     "ESTILO",
-    "Lee este texto como una locutora profesional de España, con acento castellano, "
-    "tono cálido, cercano y elegante, a ritmo pausado:")
+    "Say in a warm, natural, friendly voice with a Castilian Spanish accent from Spain")
 INICIO = 0.6  # silencio antes de la primera frase
 
 
@@ -97,11 +96,12 @@ def motor_gemini():
     voz = VOZ or "Kore"
     print(f"Gemini: modelos disponibles {modelos}, voz {voz}")
 
-    def pide(modelo, txt):
+    def pide(modelo, txt, con_estilo):
+        prompt = f"{ESTILO}: {txt}" if con_estilo and ESTILO else txt
         peticion = urllib.request.Request(
             f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent",
             data=json.dumps({
-                "contents": [{"parts": [{"text": f"{ESTILO}\n\n{txt}"}]}],
+                "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {"responseModalities": ["AUDIO"],
                                      "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voz}}}},
             }).encode(),
@@ -110,12 +110,21 @@ def motor_gemini():
             return json.load(r)
 
     def sintetiza(txt):
+        con_estilo = True
+        # duración máxima razonable: si se pasa, ha leído también la indicación de estilo
+        maximo = 0.095 * len(txt) + 2.0
         for intento in range(12):
             modelo = modelos[0]
             try:
-                r = pide(modelo, txt)
+                r = pide(modelo, txt, con_estilo)
                 datos = r["candidates"][0]["content"]["parts"][0]["inlineData"]["data"]
-                return _pcm16(base64.b64decode(datos)), 24000
+                audio = recortar_silencio(_pcm16(base64.b64decode(datos)))
+                if con_estilo and len(audio) / 24000 > maximo:
+                    print(f"  audio demasiado largo ({len(audio) / 24000:.1f}s > {maximo:.1f}s), "
+                          "repito sin indicación de estilo")
+                    con_estilo = False
+                    continue
+                return audio, 24000
             except urllib.error.HTTPError as e:
                 cuerpo = e.read().decode(errors="replace")
                 if e.code == 429 and "limit: 0" in cuerpo and len(modelos) > 1:
