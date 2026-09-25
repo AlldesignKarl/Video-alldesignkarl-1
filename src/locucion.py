@@ -108,7 +108,7 @@ def motor_gemini():
                                      "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voz}}}},
             }).encode(),
             headers={"Content-Type": "application/json", "x-goog-api-key": clave})
-        with urllib.request.urlopen(peticion, timeout=180) as r:
+        with urllib.request.urlopen(peticion, timeout=100) as r:
             return json.load(r)
 
     def siguiente_modelo(motivo):
@@ -157,6 +157,9 @@ def motor_gemini():
             except (KeyError, IndexError):
                 print(f"  {modelo}: respuesta sin audio, reintento")
                 time.sleep(5)
+            except (TimeoutError, urllib.error.URLError, ConnectionError) as e:
+                print(f"  {modelo}: sin respuesta ({e}), reintento")
+                time.sleep(10)
         sys.exit("Gemini no ha devuelto audio tras varios intentos.")
     return sintetiza
 
