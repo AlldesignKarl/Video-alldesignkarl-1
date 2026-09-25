@@ -18,5 +18,18 @@ python3 src/locucion.py   # locución, tiempos y subtítulos
 python3 src/render.py     # vídeo
 ```
 
-La voz es Kokoro `ef_dora` (femenina). `VOZ=em_alex` usa una voz masculina y `VELOCIDAD=0.9` cambia el ritmo.
+### Voz realista (recomendado)
+
+```bash
+MOTOR=google GOOGLE_API_KEY=... python3 src/locucion.py        # Chirp 3 HD, es-ES (voz: es-ES-Chirp3-HD-Aoede)
+MOTOR=gemini GEMINI_API_KEY=... python3 src/locucion.py        # Gemini TTS (voz: Kore)
+MOTOR=elevenlabs ELEVENLABS_API_KEY=... ELEVENLABS_VOICE_ID=... python3 src/locucion.py
+python3 src/render.py
+```
+
+`VOZ=...` elige otra voz del motor, `VELOCIDAD=1.0` cambia el ritmo y `ESTILO="..."` cambia la indicación de tono en Gemini.
+
+### Voz local (sin clave)
+
+Por defecto se usa Kokoro `ef_dora` (femenina). `VOZ=em_alex` usa una voz masculina y `VELOCIDAD=0.9` cambia el ritmo.
 Para ver fotogramas sueltos sin renderizar todo: `PREVIEW=5,20,45 python3 src/render.py` (se guardan en `build/preview/`).
