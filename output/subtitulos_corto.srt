@@ -1,27 +1,27 @@
 1
-00:00:00,600 --> 00:00:03,246
+00:00:00,513 --> 00:00:02,774
 Aragón también se respira.
 
 2
-00:00:03,546 --> 00:00:08,433
+00:00:03,031 --> 00:00:07,208
 Ambientador del Cachirulo: artesanal y muy aragonés.
 
 3
-00:00:08,733 --> 00:00:15,139
+00:00:07,464 --> 00:00:12,939
 Esencias naturales: coco y vainilla, mango y limón, o sol y mar.
 
 4
-00:00:15,439 --> 00:00:19,285
+00:00:13,196 --> 00:00:16,483
 Pulveriza, disfruta y repite.
 
 5
-00:00:19,585 --> 00:00:25,272
+00:00:16,739 --> 00:00:21,600
 Solo en tiendas físicas: Mercería El Siglo y Papelería Casablanca.
 
 6
-00:00:25,572 --> 00:00:28,858
+00:00:21,856 --> 00:00:24,665
 ¿Tienes una tienda? Colabora con nosotros.
 
 7
-00:00:29,558 --> 00:00:32,844
+00:00:25,263 --> 00:00:28,072
 Porque Aragón también se lleva en casa.

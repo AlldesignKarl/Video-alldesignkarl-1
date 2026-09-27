@@ -25,7 +25,7 @@ import numpy as np
 import soundfile as sf
 
 sys.path.insert(0, os.path.dirname(__file__))
-from guion import ESCENAS, SUFIJO  # noqa: E402
+from guion import ESCENAS, SUFIJO, VERSION  # noqa: E402
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELOS = os.environ.get("KOKORO_DIR", os.path.join(RAIZ, "models"))
@@ -35,6 +35,19 @@ VELOCIDAD = float(os.environ.get("VELOCIDAD", "0.92"))
 # Indicación de tono para Gemini (vacía por defecto: algunos modelos la leen en voz alta)
 ESTILO = os.environ.get("ESTILO", "")
 INICIO = 0.6  # silencio antes de la primera frase
+# Acelera la voz sin cambiar el tono (la versión corta tiene que quedar por debajo de 30 s)
+ACELERAR = float(os.environ.get("ACELERAR") or ("1.17" if VERSION == "corto" else "1.0"))
+
+
+def acelerar(audio, sr, factor):
+    if abs(factor - 1.0) < 1e-3:
+        return audio
+    import subprocess
+    import imageio_ffmpeg
+    r = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-v", "error", "-f", "f32le", "-ar", str(sr), "-ac", "1",
+                        "-i", "-", "-af", f"atempo={factor}", "-f", "f32le", "-"],
+                       input=audio.astype(np.float32).tobytes(), capture_output=True, check=True)
+    return np.frombuffer(r.stdout, dtype=np.float32).copy()
 
 
 def recortar_silencio(audio, sr=24000, antes=0.12, despues=0.3):
@@ -221,7 +234,7 @@ def main():
         audio, sr = sintetiza(escena["voz"])
         if audio.ndim > 1:
             audio = audio.mean(axis=1)
-        audio = recortar_silencio(audio.astype(np.float32), sr)
+        audio = acelerar(recortar_silencio(audio.astype(np.float32), sr), sr, ACELERAR)
         dur_voz = len(audio) / sr
         pausa = escena["pausa"]
         pista += [audio, np.zeros(int(pausa * sr), dtype=np.float32)]
