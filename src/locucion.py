@@ -25,7 +25,7 @@ import numpy as np
 import soundfile as sf
 
 sys.path.insert(0, os.path.dirname(__file__))
-from guion import ESCENAS  # noqa: E402
+from guion import ESCENAS, SUFIJO  # noqa: E402
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELOS = os.environ.get("KOKORO_DIR", os.path.join(RAIZ, "models"))
@@ -234,10 +234,10 @@ def main():
 
     voz = np.concatenate(pista)
     voz = voz / max(1e-6, np.abs(voz).max()) * 0.89  # normaliza a ~-1 dBFS
-    sf.write(os.path.join(RAIZ, "build", "locucion.wav"), voz, sr)
-    with open(os.path.join(RAIZ, "build", "tiempos.json"), "w") as f:
+    sf.write(os.path.join(RAIZ, "build", f"locucion{SUFIJO}.wav"), voz, sr)
+    with open(os.path.join(RAIZ, "build", f"tiempos{SUFIJO}.json"), "w") as f:
         json.dump({"duracion": len(voz) / sr, "escenas": tiempos}, f, indent=2, ensure_ascii=False)
-    with open(os.path.join(RAIZ, "output", "subtitulos.srt"), "w") as f:
+    with open(os.path.join(RAIZ, "output", f"subtitulos{SUFIJO}.srt"), "w") as f:
         f.write("\n".join(srt))
     print(f"Total ({MOTOR}): {len(voz) / sr:.2f}s")
 

@@ -15,7 +15,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 sys.path.insert(0, os.path.dirname(__file__))
-from guion import ESCENAS  # noqa: E402
+from guion import ESCENAS, SUFIJO  # noqa: E402
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(RAIZ, "assets")
@@ -132,12 +132,36 @@ def pegar(lienzo, capa, cx, cy, alpha=1.0, escala=1.0):
     lienzo.paste(capa.convert("RGB"), (int(cx - capa.width / 2), int(cy - capa.height / 2)), mascara)
 
 
-def momento(escena, fragmento, tiempos):
-    """Instante aproximado en que la locución dice `fragmento` (reparto por caracteres)."""
+def momento(escena, fragmento, tiempos, defecto=0.0):
+    """Instante aproximado en que la locución dice `fragmento` (reparto por caracteres).
+
+    Si el guion no contiene el fragmento, usa `defecto` (fracción 0..1 de la locución)."""
     txt = TEXTO_VOZ[escena]
     e = tiempos[escena]
     idx = txt.find(fragmento)
-    return e["voz_inicio"] + (e["voz_fin"] - e["voz_inicio"]) * idx / len(txt)
+    frac = idx / len(txt) if idx >= 0 else defecto
+    return e["voz_inicio"] + (e["voz_fin"] - e["voz_inicio"]) * frac
+
+
+def ease_out_back(x):
+    x = clamp(x)
+    c = 1.7
+    return 1 + (c + 1) * (x - 1) ** 3 + c * (x - 1) ** 2
+
+
+def pegar_revelado(lienzo, capa, cx, cy, frac):
+    """Pega la capa descubriéndola de izquierda a derecha (efecto de escritura)."""
+    frac = clamp(frac)
+    if frac <= 0.001:
+        return
+    ancho = int(capa.width * frac)
+    borde = min(40, ancho)
+    trozo = capa.crop((0, 0, ancho, capa.height))
+    if frac < 1 and borde > 1:
+        a = np.array(trozo.getchannel("A"), np.float32)
+        a[:, -borde:] *= np.linspace(1, 0, borde)[None, :]
+        trozo.putalpha(Image.fromarray(a.astype(np.uint8)))
+    lienzo.paste(trozo.convert("RGB"), (int(cx - capa.width / 2), int(cy - capa.height / 2)), trozo.getchannel("A"))
 
 
 # ---------------------------------------------------------------- recursos
@@ -181,6 +205,7 @@ def foto_centrada(zoom=1.0, cy=H / 2):
     """La foto completa, centrada y con esquinas redondeadas; `zoom` hace un ligero acercamiento."""
     img = FONDO_FOTO.copy()
     lado = int(LADO_FOTO * zoom)
+    cy += math.sin(zoom * 60) * 6
     img.paste(SOMBRA_FOTO.convert("RGB"), (int(W / 2 - SOMBRA_FOTO.width / 2), int(cy - SOMBRA_FOTO.height / 2)),
               SOMBRA_FOTO.getchannel("A"))
     tarjeta = TARJETA_FOTO.resize((lado, lado), Image.BICUBIC)
@@ -317,8 +342,7 @@ def esc_intro(t, T):
     e = T["intro"]
     p = (t - e["inicio"]) / (T["presentacion"]["fin"] - e["inicio"])
     img = foto_centrada(0.97 + 0.04 * p, 1010)
-    a1 = aparece(t, 0.35, 0.9)
-    pegar(img, texto("Aragón", "script", 190, BLANCO, sombra=8), W / 2, 250 - 30 * a1, a1)
+    pegar_revelado(img, texto("Aragón", "script", 190, BLANCO, sombra=8), W / 2, 250, ease_in_out((t - 0.3) / 1.0))
     a2 = aparece(t, 0.95, 0.8)
     pegar(img, texto("TAMBIÉN SE RESPIRA", "sans", 40, BLANCO, 500, tracking=9, sombra=6), W / 2, 415 - 20 * a2, a2)
     return img
@@ -335,7 +359,7 @@ def esc_presentacion(t, T):
     a2 = aparece(t, momento("presentacion", "Ambientador", T) - 0.1, 0.8)
     pegar(img, texto("Ambientador", "script", 118, NEGRO), W / 2, y - 40, a2)
     pegar(img, texto("del Cachirulo", "script", 118, ROJO), W / 2, y + 70, a2)
-    a3 = aparece(t, momento("presentacion", "una pieza", T), 0.8)
+    a3 = aparece(t, momento("presentacion", "una pieza", T, 0.6), 0.8)
     pegar(img, texto("ARTESANAL  ·  CUIDADO AL DETALLE", "sans", 25, TINTA, 500, tracking=4), W / 2, y + 160, a3)
     return img
 
@@ -385,10 +409,10 @@ def esc_aromas(t, T):
     img = fondo_papel(t)
     a = aparece(t, e["inicio"] + 0.1, 0.7)
     pegar(img, texto("ESENCIAS NATURALES", "sans", 32, ROJO, 600, tracking=8), W / 2, 330, a)
-    pegar(img, texto("Elige tu aroma", "script", 150, NEGRO), W / 2, 480 - 20 * (1 - a), a)
+    pegar_revelado(img, texto("Elige tu aroma", "script", 150, NEGRO), W / 2, 480, ease_in_out((t - e["inicio"] - 0.1) / 0.9))
     pegar(img, separador(560), W / 2, 610, a)
     for i, (nombre, frag, (c1, c2)) in enumerate(AROMAS):
-        ai = aparece(t, momento("aromas", frag, T) - 0.2, 0.6)
+        ai = ease_out_back((t - momento("aromas", frag, T) + 0.2) / 0.55)
         y = 830 + i * 290
         dx = 80 * (1 - ai)
         pegar(img, tarjeta(860, 220, alpha=250), W / 2 + dx, y, ai)
@@ -398,7 +422,7 @@ def esc_aromas(t, T):
         pegar(img, capa, W / 2 - 430 + 12 + dx, y, ai)
         pegar(img, medallon(c1, c2), W / 2 - 290 + dx, y, ai)
         pegar(img, texto(nombre, "serif", 78, NEGRO, 600), W / 2 + 90 + dx, y - 4, ai)
-    a4 = aparece(t, e["voz_fin"] - 0.2, 0.6)
+    a4 = aparece(t, min(e["voz_fin"] - 0.2, e["inicio"] + 1.0), 0.6)
     pegar(img, texto("FORMATO 10 ML  ·  PULVERIZADOR INCLUIDO", "sans", 26, TINTA, 500, tracking=4), W / 2, 1720, a4)
     return img
 
@@ -456,20 +480,63 @@ def esc_paso(n):
     return dibuja
 
 
+PASOS_CORTOS = [
+    ("paso1", "Pulveriza", "sobre el yeso, a 15-20 cm", "Pulveriza"),
+    ("paso2", "Disfruta", "de un aroma suave y duradero", "disfruta"),
+    ("paso3", "Repite", "cuando el aroma disminuya", "repite"),
+]
+
+
+@lru_cache(maxsize=None)
+def circulo_icono(ident, n):
+    circ = Image.new("RGBA", (250, 250), (0, 0, 0, 0))
+    ImageDraw.Draw(circ).ellipse((2, 2, 247, 247), fill=BLANCO + (255,), outline=KRAFT + (255,), width=4)
+    icono = ICONOS[ident]
+    esc = 150 / max(icono.width, icono.height)
+    icono = icono.resize((int(icono.width * esc), int(icono.height * esc)), Image.LANCZOS)
+    circ.alpha_composite(icono, (125 - icono.width // 2, 125 - icono.height // 2))
+    num = Image.new("RGBA", (70, 70), (0, 0, 0, 0))
+    ImageDraw.Draw(num).ellipse((0, 0, 69, 69), fill=ROJO + (255,))
+    cifra = texto(str(n), "serif", 46, BLANCO, 700)
+    num.alpha_composite(cifra, (35 - cifra.width // 2, 35 - cifra.height // 2))
+    circ.alpha_composite(num, (180, 0))
+    return circ
+
+
+def esc_pasos(t, T):
+    e = T["pasos"]
+    img = fondo_papel(t)
+    a = aparece(t, e["inicio"] + 0.05, 0.6)
+    pegar(img, texto("INSTRUCCIONES DE USO", "sans", 32, ROJO, 600, tracking=8), W / 2, 250, a)
+    pegar_revelado(img, texto("Así de fácil", "script", 150, NEGRO), W / 2, 390, ease_in_out((t - e["inicio"]) / 0.8))
+    pegar(img, separador(560), W / 2, 520, a)
+    for i, (ident, titulo, desc, frag) in enumerate(PASOS_CORTOS):
+        t0 = momento("pasos", frag, T, i / 3) - 0.25
+        ai = ease_out_back((t - t0) / 0.55)
+        y = 760 + i * 370
+        dx = 90 * (1 - clamp(ai))
+        pegar(img, tarjeta(900, 300, alpha=250), W / 2 + dx, y, clamp(ai))
+        vaiven = math.sin((t - t0) * 2.4) * 5
+        pegar(img, circulo_icono(ident, i + 1), W / 2 - 280 + dx, y + vaiven, clamp(ai), max(0.01, ai))
+        pegar(img, texto(titulo, "serif", 92, ROJO, 700), W / 2 + 130 + dx, y - 40, clamp(ai))
+        pegar(img, texto(desc, "sans", 34, TINTA, 500), W / 2 + 130 + dx, y + 50, clamp(ai))
+    return img
+
+
 def esc_tiendas(t, T):
     e = T["tiendas"]
     img = fondo_papel(t)
     a = aparece(t, e["inicio"] + 0.1, 0.7)
     pegar(img, texto("DISPONIBLE EXCLUSIVAMENTE EN", "sans", 32, TINTA, 500, tracking=6), W / 2, 280, a)
-    pegar(img, texto("tiendas físicas", "script", 150, ROJO), W / 2, 410 - 20 * (1 - a), a)
+    pegar_revelado(img, texto("tiendas físicas", "script", 150, ROJO), W / 2, 410, ease_in_out((t - e["inicio"] - 0.1) / 0.9))
     pegar(img, texto("COLABORADORAS", "sans", 32, TINTA, 500, tracking=6), W / 2, 530, a)
-    a0 = aparece(t, momento("tiendas", "en Mercería", T) - 0.6, 0.7)
+    a0 = aparece(t, momento("tiendas", "Mercería", T) - 0.6, 0.7)
     pegar(img, separador(560), W / 2, 640, a0)
     pegar(img, texto("¿Dónde encontrarlo?", "serif", 76, NEGRO, 600), W / 2, 750, a0)
     tiendas = [("Mercería El Siglo", "Calle Cortes de Aragón, 46", "Mercería"),
                ("Papelería Casablanca", "Calle La Vía, 16", "Papelería")]
     for i, (nombre, dir_, frag) in enumerate(tiendas):
-        ai = aparece(t, momento("tiendas", frag, T) - 0.25, 0.6)
+        ai = ease_out_back((t - momento("tiendas", frag, T) + 0.25) / 0.55)
         y = 1010 + i * 330
         dy = 40 * (1 - ai)
         pegar(img, tarjeta(880, 260, alpha=250), W / 2, y + dy, ai)
@@ -490,25 +557,25 @@ def esc_colabora(t, T):
     off = int(100 * p)
     img = FONDO_VICHY.crop((off, off, off + W, off + H))
     img = Image.blend(img, Image.new("RGB", (W, H), NEGRO), 0.7)
-    a = aparece(t, e["inicio"] + 0.1, 0.7)
-    pegar(img, texto("¿Tienes una tienda?", "script", 140, BLANCO, sombra=4), W / 2, 330 - 20 * (1 - a), a)
-    a2 = aparece(t, momento("colabora", "quieres", T) - 0.2, 0.7)
+    pegar_revelado(img, texto("¿Tienes una tienda?", "script", 140, BLANCO, sombra=4), W / 2, 330,
+                   ease_in_out((t - e["inicio"] - 0.1) / 0.9))
+    a2 = aparece(t, momento("colabora", "quieres", T, 0.15) - 0.2, 0.7)
     pegar(img, texto("COLABORA CON NOSOTROS", "sans", 46, CREMA, 600, tracking=8), W / 2, 500, a2)
     pegar(img, separador(560, CREMA), W / 2, 590, a2)
     pegar(img, parrafo("Estamos abiertos a nuevas tiendas colaboradoras.", "serif", 58, CREMA, 860, 500),
           W / 2, 700, a2)
-    a3 = aparece(t, momento("colabora", "Escríbenos", T) - 0.2, 0.7)
+    a3 = aparece(t, momento("colabora", "Escríbenos", T, 0.3) - 0.2, 0.7)
     pegar(img, tarjeta(860, 100, color=CREMA, alpha=250, radio=50, sombra=False), W / 2, 880, a3)
     pegar(img, texto("ESCRÍBENOS POR MENSAJE PRIVADO", "sans", 32, ROJO, 700, tracking=3), W / 2, 880, a3)
-    contactos = [("CORREO", "alldesignkarl@gmail.com", "correo", 1110),
-                 ("TELÉFONO", "614 65 37 36", "llámanos", 1340)]
-    for etiqueta, dato, frag, y in contactos:
-        ai = aparece(t, momento("colabora", frag, T) - 0.3, 0.6)
+    contactos = [("CORREO", "alldesignkarl@gmail.com", "correo", 0.45, 1110),
+                 ("TELÉFONO", "614 65 37 36", "llámanos", 0.6, 1340)]
+    for etiqueta, dato, frag, defecto, y in contactos:
+        ai = ease_out_back((t - momento("colabora", frag, T, defecto) + 0.3) / 0.6)
         dy = 30 * (1 - ai)
         pegar(img, tarjeta(860, 190, alpha=248), W / 2, y + dy, ai)
         pegar(img, texto(etiqueta, "sans", 28, ROJO, 600, tracking=6), W / 2, y - 45 + dy, ai)
         pegar(img, texto(dato, "serif", 68, NEGRO, 700), W / 2, y + 30 + dy, ai)
-    a4 = aparece(t, momento("colabora", "te enviaremos", T), 0.7)
+    a4 = aparece(t, momento("colabora", "te enviaremos", T, 0.8), 0.7)
     pegar(img, texto("y te enviaremos toda la información", "serif", 50, CREMA, 500), W / 2, 1580, a4)
     return img
 
@@ -519,10 +586,13 @@ def esc_cierre(t, T):
     img = foto_centrada(1.02 - 0.05 * ease_in_out(p), 1100)
     a = aparece(t, e["inicio"] + 0.1, 0.8)
     pegar(img, texto("Ambientador del Cachirulo", "script", 104, BLANCO, sombra=6), W / 2, 200, a)
-    a2 = aparece(t, momento("cierre", "Porque", T) - 0.1, 0.8)
-    pegar(img, texto("Aragón no solo se lleva en el pañuelo,", "serif", 56, BLANCO, 600, sombra=6), W / 2, 340, a2)
+    a2 = aparece(t, momento("cierre", "Porque", T, 0.0) - 0.1, 0.8)
     a3 = aparece(t, momento("cierre", "también", T) - 0.1, 0.8)
-    pegar(img, texto("también se lleva en casa.", "serif", 56, BLANCO, 600, sombra=6), W / 2, 420, a3)
+    if "pañuelo" in TEXTO_VOZ["cierre"]:
+        pegar(img, texto("Aragón no solo se lleva en el pañuelo,", "serif", 56, BLANCO, 600, sombra=6), W / 2, 340, a2)
+        pegar(img, texto("también se lleva en casa.", "serif", 56, BLANCO, 600, sombra=6), W / 2, 420, a3)
+    else:
+        pegar(img, texto("Aragón también se lleva en casa.", "serif", 60, BLANCO, 600, sombra=6), W / 2, 370, a3)
 
     # tarjeta final
     fin = ease_in_out((t - (e["voz_fin"] + 0.3)) / 0.8)
@@ -546,6 +616,7 @@ ESCENA_FN = {
     "paso1": esc_paso(0),
     "paso2": esc_paso(1),
     "paso3": esc_paso(2),
+    "pasos": esc_pasos,
     "tiendas": esc_tiendas,
     "colabora": esc_colabora,
     "cierre": esc_cierre,
@@ -553,6 +624,51 @@ ESCENA_FN = {
 
 # transiciones: la intro y la presentación comparten plano (sin fundido)
 SIN_FUNDIDO = {"presentacion"}
+
+
+def _particula(tam=46):
+    yy, xx = np.mgrid[0:tam, 0:tam]
+    r = np.hypot(xx - tam / 2, yy - tam / 2) / (tam / 2)
+    a = np.clip(1 - r, 0, 1) ** 2.2 * 255
+    capa = Image.new("RGBA", (tam, tam), (255, 244, 220, 0))
+    capa.putalpha(Image.fromarray(a.astype(np.uint8)))
+    return capa
+
+
+PARTICULA = _particula()
+_rng = np.random.default_rng(3)
+PARTICULAS = [(_rng.uniform(0, W), _rng.uniform(0, H), _rng.uniform(25, 70), _rng.uniform(0.35, 1.0),
+               _rng.uniform(0, 6.28), _rng.uniform(0.25, 0.6)) for _ in range(26)]
+
+
+def particulas(img, t):
+    """Motas de luz que suben despacio, como el aroma."""
+    for x0, y0, vel, esc, fase, alpha in PARTICULAS:
+        y = (y0 - vel * t) % (H + 100) - 50
+        x = x0 + math.sin(t * 0.7 + fase) * 30
+        brillo = alpha * (0.6 + 0.4 * math.sin(t * 2.0 + fase))
+        pegar(img, PARTICULA, x, y, brillo, esc)
+
+
+BARRIDO = 0.55
+BANDA = vichy(160, H, q=20)
+
+
+def barrido(previa, nueva, p, izquierda):
+    """Transición: una banda de cuadro vichy cruza la pantalla y descubre la escena nueva."""
+    p = ease_in_out(p)
+    x = int(-160 + (W + 320) * p)
+    img = previa.copy()
+    if izquierda:
+        if x > 0:
+            img.paste(nueva.crop((0, 0, min(W, x), H)), (0, 0))
+        img.paste(BANDA, (x - 80, 0))
+    else:
+        xr = W - x
+        if xr < W:
+            img.paste(nueva.crop((max(0, xr), 0, W, H)), (max(0, xr), 0))
+        img.paste(BANDA, (xr - 80, 0))
+    return img
 
 
 def fotograma(t, T, orden):
@@ -563,14 +679,18 @@ def fotograma(t, T, orden):
     ident = orden[idx]
     img = ESCENA_FN[ident](t, T)
     dt = t - T[ident]["inicio"]
-    if idx > 0 and dt < FUNDIDO and ident not in SIN_FUNDIDO:
+    if idx > 0 and dt < BARRIDO and ident not in SIN_FUNDIDO and ident != "cierre":
+        previa = ESCENA_FN[orden[idx - 1]](t, T)
+        img = barrido(previa, img, dt / BARRIDO, idx % 2 == 1)
+    elif idx > 0 and dt < FUNDIDO and ident not in SIN_FUNDIDO:
         previa = ESCENA_FN[orden[idx - 1]](t, T)
         img = Image.blend(previa, img, ease_in_out(dt / FUNDIDO))
+    particulas(img, t)
     return img
 
 
 def main():
-    with open(os.path.join(RAIZ, "build", "tiempos.json")) as f:
+    with open(os.path.join(RAIZ, "build", f"tiempos{SUFIJO}.json")) as f:
         datos = json.load(f)
     T = {e["id"]: e for e in datos["escenas"]}
     orden = [e["id"] for e in datos["escenas"]]
@@ -585,11 +705,11 @@ def main():
                                                quality=85)
         return
 
-    salida = os.path.join(RAIZ, "output", "ambientador_cachirulo_reel.mp4")
+    salida = os.path.join(RAIZ, "output", f"ambientador_cachirulo_reel{SUFIJO}.mp4")
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
     cmd = [ffmpeg, "-y", "-loglevel", "error",
            "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
-           "-i", os.path.join(RAIZ, "build", "locucion.wav"),
+           "-i", os.path.join(RAIZ, "build", f"locucion{SUFIJO}.wav"),
            "-af", "loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000",
            "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p", "-profile:v", "high",
            "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest", salida]

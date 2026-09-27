@@ -3,6 +3,11 @@ name: Generar vídeo con voz realista
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: "Versión del vídeo"
+        type: choice
+        options: [corto, largo]
+        default: "corto"
       voz:
         description: "Voz de Gemini (Kore, Aoede, Leda, Callirrhoe, Charon, Puck...)"
         default: "Kore"
@@ -39,26 +44,27 @@ jobs:
       - name: Generar locución con Gemini
         env:
           MOTOR: gemini
+          VERSION: ${{ inputs.version }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           VOZ: ${{ inputs.voz }}
           VELOCIDAD: ${{ inputs.velocidad }}
         run: python src/locucion.py
 
       - name: Renderizar vídeo
+        env:
+          VERSION: ${{ inputs.version }}
         run: python src/render.py
 
       - name: Guardar vídeo como descarga
         uses: actions/upload-artifact@v4
         with:
           name: reel-ambientador-cachirulo
-          path: |
-            output/ambientador_cachirulo_reel.mp4
-            output/subtitulos.srt
+          path: output/
 
       - name: Subir vídeo al repositorio
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add output/
-          git commit -m "Reel con voz de Gemini (${{ inputs.voz }})" || echo "Sin cambios"
+          git commit -m "Reel ${{ inputs.version }} con voz de Gemini (${{ inputs.voz }})" || echo "Sin cambios"
           git push

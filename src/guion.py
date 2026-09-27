@@ -3,8 +3,9 @@
 La duración de cada escena la marca su locución (más una pausa), así que
 voz y vídeo siempre van sincronizados.
 """
+import os
 
-ESCENAS = [
+ESCENAS_LARGO = [
     {
         "id": "intro",
         "voz": "Aragón también se respira.",
@@ -64,3 +65,18 @@ ESCENAS = [
         "pausa": 2.6,
     },
 ]
+
+# Versión corta (20-30 s) para Reels
+ESCENAS_CORTO = [
+    {"id": "intro", "voz": "Aragón también se respira.", "pausa": 0.3},
+    {"id": "presentacion", "voz": "Ambientador del Cachirulo: artesanal y muy aragonés.", "pausa": 0.3},
+    {"id": "aromas", "voz": "Esencias naturales: coco y vainilla, mango y limón, o sol y mar.", "pausa": 0.3},
+    {"id": "pasos", "voz": "Pulveriza, disfruta y repite.", "pausa": 0.3},
+    {"id": "tiendas", "voz": "Solo en tiendas físicas: Mercería El Siglo y Papelería Casablanca.", "pausa": 0.3},
+    {"id": "colabora", "voz": "¿Tienes una tienda? Colabora con nosotros.", "pausa": 0.7},
+    {"id": "cierre", "voz": "Porque Aragón también se lleva en casa.", "pausa": 1.5},
+]
+
+VERSION = os.environ.get("VERSION", "largo")
+ESCENAS = ESCENAS_CORTO if VERSION == "corto" else ESCENAS_LARGO
+SUFIJO = "_corto" if VERSION == "corto" else ""
