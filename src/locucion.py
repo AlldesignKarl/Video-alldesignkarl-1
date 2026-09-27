@@ -50,10 +50,55 @@ def acelerar(audio, sr, factor):
     return np.frombuffer(r.stdout, dtype=np.float32).copy()
 
 
+def quitar_artefactos(audio, sr=24000, hueco=0.1, max_ruido=0.3):
+    """Elimina los golpes cortos que algunos motores (Gemini) añaden al principio o al final
+    del audio, separados de la voz por un pequeño silencio."""
+    if len(audio) == 0:
+        return audio
+    ventana = max(1, int(0.01 * sr))
+    env = np.convolve(np.abs(audio), np.ones(ventana) / ventana, mode="same")
+    activo = env > max(0.002, 0.02 * float(np.abs(audio).max()))
+    # tramos con sonido, uniendo huecos menores que `hueco`
+    tramos, i, n = [], 0, len(activo)
+    while i < n:
+        if activo[i]:
+            j = i
+            while j < n and activo[j]:
+                j += 1
+            if tramos and i - tramos[-1][1] < hueco * sr:
+                tramos[-1][1] = j
+            else:
+                tramos.append([i, j])
+            i = j
+        else:
+            i += 1
+    audio = audio.copy()
+    while len(tramos) > 1 and tramos[-1][1] - tramos[-1][0] < max_ruido * sr:
+        a, b = tramos.pop()
+        audio[a:b] = 0
+    while len(tramos) > 1 and tramos[0][1] - tramos[0][0] < max_ruido * sr:
+        a, b = tramos.pop(0)
+        audio[a:b] = 0
+    return audio
+
+
+def puerta_ruido(audio, sr=24000, umbral=0.01, margen=0.08, suavizado=0.015):
+    """Silencia del todo los huecos entre frases (quita chasquidos y ruido de fondo)."""
+    ventana = max(1, int(0.01 * sr))
+    env = np.convolve(np.abs(audio), np.ones(ventana) / ventana, mode="same")
+    abierta = (env > umbral).astype(np.float32)
+    m = int(margen * sr)
+    abierta = (np.convolve(abierta, np.ones(2 * m + 1), mode="same") > 0).astype(np.float32)
+    k = max(1, int(suavizado * sr))
+    abierta = np.convolve(abierta, np.ones(k) / k, mode="same")
+    return audio * abierta
+
+
 def recortar_silencio(audio, sr=24000, antes=0.12, despues=0.3):
     """Quita el silencio de los extremos con margen amplio y suaviza los bordes (sin clics ni cortes)."""
     if len(audio) == 0:
         return audio
+    audio = quitar_artefactos(audio, sr)
     umbral = max(0.002, 0.02 * float(np.abs(audio).max()))
     # envolvente suavizada (10 ms) para no cortar consonantes suaves ni finales de palabra
     ventana = max(1, int(0.01 * sr))
@@ -245,7 +290,7 @@ def main():
         t += dur_voz + pausa
         print(f"{escena['id']:<14} {dur_voz:5.2f}s")
 
-    voz = np.concatenate(pista)
+    voz = puerta_ruido(np.concatenate(pista), sr)
     voz = voz / max(1e-6, np.abs(voz).max()) * 0.89  # normaliza a ~-1 dBFS
     sf.write(os.path.join(RAIZ, "build", f"locucion{SUFIJO}.wav"), voz, sr)
     with open(os.path.join(RAIZ, "build", f"tiempos{SUFIJO}.json"), "w") as f:
