@@ -1,15 +1,15 @@
 1
-00:00:00,600 --> 00:00:04,306
+00:00:00,600 --> 00:00:03,563
 Estos son nuestros Ambientadores del Cachirulo.
 
 2
-00:00:04,856 --> 00:00:10,512
-Creados de forma artesanal, con pulverizador de diez mililitros incluido.
+00:00:04,013 --> 00:00:08,170
+Creados de forma artesanal, con pulverizador de diez mililitros.
 
 3
-00:00:11,062 --> 00:00:22,365
-Encuéntralos exclusivamente en nuestras tiendas colaboradoras: Mercería El Siglo, en la calle Cortes de Aragón, cuarenta y seis; y Papelería Casablanca, en la calle La Vía, dieciséis.
+00:00:08,620 --> 00:00:18,642
+Encuéntralos exclusivamente en nuestras tiendas colaboradoras: Mercería El Siglo, en Cortes de Aragón, cuarenta y seis; y Papelería Casablanca, en La Vía, dieciséis.
 
 4
-00:00:22,965 --> 00:00:25,666
-Ven a descubrirlos. ¡Te esperamos!
+00:00:19,142 --> 00:00:21,392
+Descúbrelos. ¡Te esperamos!
