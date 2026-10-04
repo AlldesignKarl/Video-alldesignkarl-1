@@ -77,6 +77,16 @@ ESCENAS_CORTO = [
     {"id": "cierre", "voz": "Porque Aragón también se lleva en casa.", "pausa": 1.5},
 ]
 
+# Anuncio de producto (15-20 s) sobre el vídeo del ambientador girando
+ESCENAS_ANUNCIO = [
+    {"id": "intro", "voz": "Estos son nuestros Ambientadores del Cachirulo.", "pausa": 0.55},
+    {"id": "artesanal", "voz": "Creados de forma artesanal, con pulverizador de diez mililitros incluido.", "pausa": 0.55},
+    {"id": "tiendas", "voz": "Encuéntralos exclusivamente en nuestras tiendas colaboradoras: "
+                             "Mercería El Siglo, en la calle Cortes de Aragón, cuarenta y seis; "
+                             "y Papelería Casablanca, en la calle La Vía, dieciséis.", "pausa": 0.6},
+    {"id": "cierre", "voz": "Ven a descubrirlos. ¡Te esperamos!", "pausa": 1.6},
+]
+
 VERSION = os.environ.get("VERSION", "largo")
-ESCENAS = ESCENAS_CORTO if VERSION == "corto" else ESCENAS_LARGO
-SUFIJO = "_corto" if VERSION == "corto" else ""
+ESCENAS = {"corto": ESCENAS_CORTO, "anuncio": ESCENAS_ANUNCIO}.get(VERSION, ESCENAS_LARGO)
+SUFIJO = f"_{VERSION}" if VERSION in ("corto", "anuncio") else ""

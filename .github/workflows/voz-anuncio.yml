@@ -1,0 +1,46 @@
+name: Locución del anuncio (Gemini)
+
+on:
+  push:
+    branches: [claude/cachirulo-product-video-khsqin]
+    paths: [src/guion.py, src/locucion.py, .github/workflows/voz-anuncio.yml]
+  workflow_dispatch:
+    inputs:
+      voz:
+        description: "Voz de Gemini (Kore, Aoede, Leda, Callirrhoe, Charon, Puck...)"
+        default: "Kore"
+
+permissions:
+  contents: write
+
+jobs:
+  voz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install numpy soundfile imageio-ffmpeg
+
+      - name: Generar locución con Gemini
+        env:
+          MOTOR: gemini
+          VERSION: anuncio
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VOZ: ${{ inputs.voz || 'Kore' }}
+        run: python src/locucion.py
+
+      - name: Subir la locución al repositorio
+        run: |
+          mkdir -p assets/anuncio
+          cp build/locucion_anuncio.wav build/tiempos_anuncio.json assets/anuncio/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/anuncio output/subtitulos_anuncio.srt
+          git commit -m "Locución del anuncio con voz de Gemini (${{ inputs.voz || 'Kore' }})" || exit 0
+          for i in 1 2 3; do git pull --rebase origin "$GITHUB_REF_NAME" && git push && break; sleep 5; done
