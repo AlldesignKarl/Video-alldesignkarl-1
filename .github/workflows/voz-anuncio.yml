@@ -33,6 +33,7 @@ jobs:
           VERSION: anuncio
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           VOZ: ${{ inputs.voz || 'Kore' }}
+          ACELERAR: "1.08"
         run: python src/locucion.py
 
       - name: Subir la locución al repositorio

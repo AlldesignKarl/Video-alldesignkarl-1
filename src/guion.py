@@ -79,12 +79,12 @@ ESCENAS_CORTO = [
 
 # Anuncio de producto (15-20 s) sobre el vídeo del ambientador girando
 ESCENAS_ANUNCIO = [
-    {"id": "intro", "voz": "Estos son nuestros Ambientadores del Cachirulo.", "pausa": 0.55},
-    {"id": "artesanal", "voz": "Creados de forma artesanal, con pulverizador de diez mililitros incluido.", "pausa": 0.55},
+    {"id": "intro", "voz": "Estos son nuestros Ambientadores del Cachirulo.", "pausa": 0.45},
+    {"id": "artesanal", "voz": "Creados de forma artesanal, con pulverizador de diez mililitros.", "pausa": 0.45},
     {"id": "tiendas", "voz": "Encuéntralos exclusivamente en nuestras tiendas colaboradoras: "
-                             "Mercería El Siglo, en la calle Cortes de Aragón, cuarenta y seis; "
-                             "y Papelería Casablanca, en la calle La Vía, dieciséis.", "pausa": 0.6},
-    {"id": "cierre", "voz": "Ven a descubrirlos. ¡Te esperamos!", "pausa": 1.6},
+                             "Mercería El Siglo, en Cortes de Aragón, cuarenta y seis; "
+                             "y Papelería Casablanca, en La Vía, dieciséis.", "pausa": 0.5},
+    {"id": "cierre", "voz": "Descúbrelos. ¡Te esperamos!", "pausa": 1.4},
 ]
 
 VERSION = os.environ.get("VERSION", "largo")
